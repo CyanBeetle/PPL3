@@ -367,7 +367,7 @@ class HLangBuilder:
 
         # Upgrade pip
         print(self.colors.yellow("Upgrading pip in virtual environment..."))
-        self.run_command([str(self.venv_pip), "install", "--upgrade", "pip"])
+        self.run_command([str(self.venv_python3), "-m", "pip", "install", "--upgrade", "pip"])
         print(self.colors.green("pip upgraded successfully."))
 
         # Install dependencies
@@ -376,7 +376,7 @@ class HLangBuilder:
                 "Installing Python dependencies in virtual environment..."
             )
         )
-        self.run_command([str(self.venv_pip), "install", "-r", "requirements.txt"])
+        self.run_command([str(self.venv_python3), "-m", "pip", "install", "-r", "requirements.txt"])
         print(
             self.colors.green("Python dependencies installed in virtual environment.")
         )
