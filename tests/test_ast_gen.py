@@ -47,7 +47,7 @@ def test_006():
             return 0;
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(BinaryOp(Identifier(x), >, IntegerLiteral(0)), else)])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(condition=BinaryOp(Identifier(x), >, IntegerLiteral(0)), then_stmt=BlockStmt([ReturnStmt(Identifier(x))]), else_stmt=BlockStmt([ReturnStmt(IntegerLiteral(0))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -57,7 +57,7 @@ def test_007():
         while (i < 10) { 
             i = i + 1; 
         }
-    };"""
+    }"""
     expected = "Program(funcs=[FuncDecl(main, [], void, [WhileStmt(BinaryOp(Identifier(i), <, IntegerLiteral(10)), BlockStmt([Assignment(IdLValue(i), BinaryOp(Identifier(i), +, IntegerLiteral(1)))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
@@ -67,7 +67,7 @@ def test_008():
     source = """func main() -> void { 
         let arr = [1, 2, 3];
         let first = arr[0];
-    };"""
+    }"""
     expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(arr, ArrayLiteral([IntegerLiteral(1), IntegerLiteral(2), IntegerLiteral(3)])), VarDecl(first, ArrayAccess(Identifier(arr), IntegerLiteral(0)))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
@@ -76,7 +76,7 @@ def test_009():
     """Test pipeline operator AST generation"""
     source = """func main() -> void { 
         let result = data >> process;
-    };"""
+    }"""
     expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(result, BinaryOp(Identifier(data), >>, Identifier(process)))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
