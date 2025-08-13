@@ -398,7 +398,7 @@ def test_050():
             return x; 
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(BinaryOp(Identifier(x), >, IntegerLiteral(0)))])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(condition=BinaryOp(Identifier(x), >, IntegerLiteral(0)), then_stmt=BlockStmt([ReturnStmt(Identifier(x))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -408,10 +408,10 @@ def test_051():
         if (x > 0) { 
             return x; 
         } else { 
-            return 0; 
+            return 0;
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(BinaryOp(Identifier(x), >, IntegerLiteral(0)), else)])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(condition=BinaryOp(Identifier(x), >, IntegerLiteral(0)), then_stmt=BlockStmt([ReturnStmt(Identifier(x))]), else_stmt=BlockStmt([ReturnStmt(IntegerLiteral(0))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -424,7 +424,7 @@ def test_052():
             result = x + y;
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(Identifier(condition), BlockStmt([VarDecl(x, IntegerLiteral(10)), VarDecl(y, IntegerLiteral(20)), Assignment(IdLValue(result), BinaryOp(Identifier(x), +, Identifier(y)))]), [], )])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(condition=Identifier(condition), then_stmt=BlockStmt([VarDecl(x, IntegerLiteral(10)), VarDecl(y, IntegerLiteral(20)), Assignment(IdLValue(result), BinaryOp(Identifier(x), +, Identifier(y)))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -435,7 +435,7 @@ def test_053():
             process(); 
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(BinaryOp(BinaryOp(Identifier(x), >, IntegerLiteral(0)), &&, BinaryOp(Identifier(y), <, IntegerLiteral(10))), BlockStmt([ExprStmt(FunctionCall(Identifier(process), []))]), [], )])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(condition=BinaryOp(BinaryOp(Identifier(x), >, IntegerLiteral(0)), &&, BinaryOp(Identifier(y), <, IntegerLiteral(10))), then_stmt=BlockStmt([ExprStmt(FunctionCall(Identifier(process), []))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -448,7 +448,7 @@ def test_054():
             }
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(BinaryOp(Identifier(x), >, IntegerLiteral(0)), BlockStmt([IfStmt(BinaryOp(Identifier(y), >, IntegerLiteral(0)), BlockStmt([ReturnStmt(BinaryOp(Identifier(x), +, Identifier(y)))]), [], )]), [], )])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(condition=BinaryOp(Identifier(x), >, IntegerLiteral(0)), then_stmt=BlockStmt([IfStmt(condition=BinaryOp(Identifier(y), >, IntegerLiteral(0)), then_stmt=BlockStmt([ReturnStmt(BinaryOp(Identifier(x), +, Identifier(y)))]))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -459,7 +459,7 @@ def test_055():
             execute(); 
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(BooleanLiteral(True), BlockStmt([ExprStmt(FunctionCall(Identifier(execute), []))]), [], )])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(condition=BooleanLiteral(True), then_stmt=BlockStmt([ExprStmt(FunctionCall(Identifier(execute), []))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -470,7 +470,7 @@ def test_056():
             handle_false(); 
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(UnaryOp(!, Identifier(flag)), BlockStmt([ExprStmt(FunctionCall(Identifier(handle_false), []))]), [], )])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(condition=UnaryOp(!, Identifier(flag)), then_stmt=BlockStmt([ExprStmt(FunctionCall(Identifier(handle_false), []))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -481,7 +481,7 @@ def test_057():
             proceed(); 
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(FunctionCall(Identifier(is_valid), []), BlockStmt([ExprStmt(FunctionCall(Identifier(proceed), []))]), [], )])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(condition=FunctionCall(Identifier(is_valid), []), then_stmt=BlockStmt([ExprStmt(FunctionCall(Identifier(proceed), []))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -492,7 +492,7 @@ def test_058():
             equal(); 
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(BinaryOp(Identifier(a), ==, Identifier(b)), BlockStmt([ExprStmt(FunctionCall(Identifier(equal), []))]), [], )])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(condition=BinaryOp(Identifier(a), ==, Identifier(b)), then_stmt=BlockStmt([ExprStmt(FunctionCall(Identifier(equal), []))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -503,7 +503,7 @@ def test_059():
             process(); 
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(BinaryOp(BinaryOp(Identifier(x), +, Identifier(y)), >, Identifier(z)), BlockStmt([ExprStmt(FunctionCall(Identifier(process), []))]), [], )])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [IfStmt(condition=BinaryOp(BinaryOp(Identifier(x), +, Identifier(y)), >, Identifier(z)), then_stmt=BlockStmt([ExprStmt(FunctionCall(Identifier(process), []))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -592,7 +592,7 @@ def test_066():
             }
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [WhileStmt(BooleanLiteral(True), BlockStmt([IfStmt(Identifier(should_exit), BlockStmt([BreakStmt()]), [], )]))])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [WhileStmt(BooleanLiteral(True), BlockStmt([IfStmt(condition=Identifier(should_exit), then_stmt=BlockStmt([BreakStmt()]))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -606,7 +606,7 @@ def test_067():
             process(i);
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [WhileStmt(BinaryOp(Identifier(i), <, IntegerLiteral(10)), BlockStmt([IfStmt(Identifier(skip_condition), BlockStmt([ContinueStmt()]), [], ), ExprStmt(FunctionCall(Identifier(process), [Identifier(i)]))]))])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [WhileStmt(BinaryOp(Identifier(i), <, IntegerLiteral(10)), BlockStmt([IfStmt(condition=Identifier(skip_condition), then_stmt=BlockStmt([ContinueStmt()])), ExprStmt(FunctionCall(Identifier(process), [Identifier(i)]))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -703,7 +703,7 @@ def test_075():
             }
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [ForStmt(item, Identifier(items), BlockStmt([IfStmt(BinaryOp(Identifier(item), ==, Identifier(target)), BlockStmt([BreakStmt()]), [], )]))])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [ForStmt(item, Identifier(items), BlockStmt([IfStmt(condition=BinaryOp(Identifier(item), ==, Identifier(target)), then_stmt=BlockStmt([BreakStmt()]))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -717,7 +717,7 @@ def test_076():
             process(item);
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [ForStmt(item, Identifier(items), BlockStmt([IfStmt(FunctionCall(Identifier(should_skip), [Identifier(item)]), BlockStmt([ContinueStmt()]), [], ), ExprStmt(FunctionCall(Identifier(process), [Identifier(item)]))]))])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [ForStmt(item, Identifier(items), BlockStmt([IfStmt(condition=FunctionCall(Identifier(should_skip), [Identifier(item)]), then_stmt=BlockStmt([ContinueStmt()])), ExprStmt(FunctionCall(Identifier(process), [Identifier(item)]))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -760,7 +760,7 @@ def test_079():
 def test_080():
     """Test arithmetic expressions"""
     source = "func main() -> void { let result = a + b - c * d / e % f; }"
-    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(result, BinaryOp(BinaryOp(BinaryOp(Identifier(a), +, Identifier(b)), -, BinaryOp(BinaryOp(BinaryOp(Identifier(c), *, Identifier(d)), /, Identifier(e)), %, Identifier(f))))])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(result, BinaryOp(BinaryOp(Identifier(a), +, Identifier(b)), -, BinaryOp(BinaryOp(BinaryOp(Identifier(c), *, Identifier(d)), /, Identifier(e)), %, Identifier(f))))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -809,21 +809,21 @@ def test_086():
 def test_087():
     """Test mixed expression precedence"""
     source = "func main() -> void { let result = a && b || c >> d + e * f; }"
-    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(result, BinaryOp(BinaryOp(Identifier(a), &&, Identifier(b)), ||, BinaryOp(Identifier(c), >>, BinaryOp(Identifier(d), +, BinaryOp(Identifier(e), *, Identifier(f))))))])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(result, BinaryOp(BinaryOp(BinaryOp(Identifier(a), &&, Identifier(b)), ||, Identifier(c)), >>, BinaryOp(Identifier(d), +, BinaryOp(Identifier(e), *, Identifier(f)))))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
 def test_088():
     """Test complex nested expressions"""
-    source = "func main() -> void { let result = func(a[i] + b, (c * d) >> process) >= threshold; }"
-    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(result, BinaryOp(FunctionCall(Identifier(func), [BinaryOp(ArrayAccess(Identifier(a), Identifier(i)), +, Identifier(b)), BinaryOp(BinaryOp(Identifier(c), *, Identifier(d)), >>, Identifier(process))]), >=, Identifier(threshold)))])])"
+    source = "func main() -> void { let result = calculate(a[i] + b, (c * d) >> process) >= threshold; }"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(result, BinaryOp(FunctionCall(Identifier(calculate), [BinaryOp(ArrayAccess(Identifier(a), Identifier(i)), +, Identifier(b)), BinaryOp(BinaryOp(Identifier(c), *, Identifier(d)), >>, Identifier(process))]), >=, Identifier(threshold)))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
 def test_089():
     """Test expression with all literal types"""
     source = "func main() -> void { let result = 42 + 3.14 + true + \"hello\" + [1, 2, 3]; }"
-    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(result, BinaryOp(BinaryOp(BinaryOp(BinaryOp(IntegerLiteral(42), +, FloatLiteral(3.14)), +, BooleanLiteral(True)), +, StringLiteral(hello)), +, ArrayLiteral([IntegerLiteral(1), IntegerLiteral(2), IntegerLiteral(3)])))])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(result, BinaryOp(BinaryOp(BinaryOp(BinaryOp(IntegerLiteral(42), +, FloatLiteral(3.14)), +, BooleanLiteral(True)), +, StringLiteral('hello')), +, ArrayLiteral([IntegerLiteral(1), IntegerLiteral(2), IntegerLiteral(3)])))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -840,7 +840,7 @@ def test_090():
             return calculate(); 
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(test, [], int, [IfStmt(Identifier(condition), BlockStmt([ReturnStmt(IntegerLiteral(42))]), [], BlockStmt([ReturnStmt(FunctionCall(Identifier(calculate), []))]))])])"
+    expected = "Program(funcs=[FuncDecl(test, [], int, [IfStmt(condition=Identifier(condition), then_stmt=BlockStmt([ReturnStmt(IntegerLiteral(42))]), else_stmt=BlockStmt([ReturnStmt(FunctionCall(Identifier(calculate), []))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -857,7 +857,7 @@ def test_091():
             work();
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(main, [], void, [WhileStmt(BooleanLiteral(True), BlockStmt([IfStmt(Identifier(should_break), BlockStmt([BreakStmt()]), [], ), IfStmt(Identifier(should_continue), BlockStmt([ContinueStmt()]), [], ), ExprStmt(FunctionCall(Identifier(work), []))]))])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [WhileStmt(BooleanLiteral(True), BlockStmt([IfStmt(condition=Identifier(should_break), then_stmt=BlockStmt([BreakStmt()])), IfStmt(condition=Identifier(should_continue), then_stmt=BlockStmt([ContinueStmt()])), ExprStmt(FunctionCall(Identifier(work), []))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -881,7 +881,7 @@ def test_093():
 def test_094():
     """Test string literals with content"""
     source = "func main() -> void { let msg = \"Hello, World!\"; }"
-    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(msg, StringLiteral(Hello, World!))])])"
+    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(msg, StringLiteral('Hello, World!'))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -921,7 +921,7 @@ def test_097():
         }
         return sum > 0;
     }"""
-    expected = "Program(funcs=[FuncDecl(complex_function, [Param(arr, [int; 10]), Param(threshold, int)], bool, [VarDecl(sum, IntegerLiteral(0)), ForStmt(value, Identifier(arr), BlockStmt([IfStmt(BinaryOp(Identifier(value), >, Identifier(threshold)), BlockStmt([Assignment(IdLValue(sum), BinaryOp(Identifier(sum), +, Identifier(value)))]), [], )])), ReturnStmt(BinaryOp(Identifier(sum), >, IntegerLiteral(0)))])])"
+    expected = "Program(funcs=[FuncDecl(complex_function, [Param(arr, [int; 10]), Param(threshold, int)], bool, [VarDecl(sum, IntegerLiteral(0)), ForStmt(value, Identifier(arr), BlockStmt([IfStmt(condition=BinaryOp(Identifier(value), >, Identifier(threshold)), then_stmt=BlockStmt([Assignment(IdLValue(sum), BinaryOp(Identifier(sum), +, Identifier(value)))]))])), ReturnStmt(BinaryOp(Identifier(sum), >, IntegerLiteral(0)))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -934,7 +934,7 @@ def test_098():
             return b - a; 
         }
     }"""
-    expected = "Program(funcs=[FuncDecl(calculate, [Param(a, int), Param(b, float), Param(c, bool), Param(d, string)], float, [IfStmt(Identifier(c), BlockStmt([ReturnStmt(BinaryOp(Identifier(a), +, Identifier(b)))]), [], BlockStmt([ReturnStmt(BinaryOp(Identifier(b), -, Identifier(a)))]))])])"
+    expected = "Program(funcs=[FuncDecl(calculate, [Param(a, int), Param(b, float), Param(c, bool), Param(d, string)], float, [IfStmt(condition=Identifier(c), then_stmt=BlockStmt([ReturnStmt(BinaryOp(Identifier(a), +, Identifier(b)))]), else_stmt=BlockStmt([ReturnStmt(BinaryOp(Identifier(b), -, Identifier(a)))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
 
 
@@ -982,5 +982,121 @@ def test_100():
             }
         }
     }"""
-    expected = "Program(consts=[ConstDecl(PI, float, FloatLiteral(3.14159)), ConstDecl(MAX_SIZE, IntegerLiteral(1000))], funcs=[FuncDecl(factorial, [Param(n, int)], int, [IfStmt(BinaryOp(Identifier(n), <=, IntegerLiteral(1)), BlockStmt([ReturnStmt(IntegerLiteral(1))]), [], BlockStmt([ReturnStmt(BinaryOp(Identifier(n), *, FunctionCall(Identifier(factorial), [BinaryOp(Identifier(n), -, IntegerLiteral(1))])))])]), FuncDecl(main, [], void, [VarDecl(numbers, [int; 5], ArrayLiteral([IntegerLiteral(1), IntegerLiteral(2), IntegerLiteral(3), IntegerLiteral(4), IntegerLiteral(5)])), VarDecl(result, IntegerLiteral(0)), ForStmt(num, Identifier(numbers), BlockStmt([Assignment(IdLValue(result), BinaryOp(Identifier(result), +, FunctionCall(Identifier(factorial), [Identifier(num)])))])), WhileStmt(BinaryOp(Identifier(result), >, IntegerLiteral(0)), BlockStmt([IfStmt(BinaryOp(BinaryOp(Identifier(result), %, IntegerLiteral(2)), ==, IntegerLiteral(0)), BlockStmt([Assignment(IdLValue(result), BinaryOp(Identifier(result), /, IntegerLiteral(2)))]), [], BlockStmt([BreakStmt()]))]))])])"
+    expected = "Program(consts=[ConstDecl(PI, float, FloatLiteral(3.14159)), ConstDecl(MAX_SIZE, IntegerLiteral(1000))], funcs=[FuncDecl(factorial, [Param(n, int)], int, [IfStmt(condition=BinaryOp(Identifier(n), <=, IntegerLiteral(1)), then_stmt=BlockStmt([ReturnStmt(IntegerLiteral(1))]), else_stmt=BlockStmt([ReturnStmt(BinaryOp(Identifier(n), *, FunctionCall(Identifier(factorial), [BinaryOp(Identifier(n), -, IntegerLiteral(1))])))])]), FuncDecl(main, [], void, [VarDecl(numbers, [int; 5], ArrayLiteral([IntegerLiteral(1), IntegerLiteral(2), IntegerLiteral(3), IntegerLiteral(4), IntegerLiteral(5)])), VarDecl(result, IntegerLiteral(0)), ForStmt(num, Identifier(numbers), BlockStmt([Assignment(IdLValue(result), BinaryOp(Identifier(result), +, FunctionCall(Identifier(factorial), [Identifier(num)])))])), WhileStmt(BinaryOp(Identifier(result), >, IntegerLiteral(0)), BlockStmt([IfStmt(condition=BinaryOp(BinaryOp(Identifier(result), %, IntegerLiteral(2)), ==, IntegerLiteral(0)), then_stmt=BlockStmt([Assignment(IdLValue(result), BinaryOp(Identifier(result), /, IntegerLiteral(2)))]), else_stmt=BlockStmt([BreakStmt()]))]))])])"
+    actual = str(ASTGenerator(source).generate())
+    print(f"Expected: {expected}")
+    print(f"Actual:   {actual}")
+    assert actual == expected
+
+
+# ============================================================================
+# Additional Test Cases 101-110 (Assignment 2)
+# ============================================================================
+
+def test_101():
+    """Test function with lambda/anonymous function expression"""
+    source = """func main() -> void {
+        let f = func(x: int) -> int { return x * 2; };
+    }"""
+    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(f, FuncDecl(, [Param(x, int)], int, [ReturnStmt(BinaryOp(Identifier(x), *, IntegerLiteral(2)))]))])])"
     assert str(ASTGenerator(source).generate()) == expected
+
+
+def test_102():
+    """Test dynamic array type annotation"""
+    source = """func process(data: [int]) -> void {
+        let item = data[0];
+    }"""
+    expected = "Program(funcs=[FuncDecl(process, [Param(data, [int; 0])], void, [VarDecl(item, ArrayAccess(Identifier(data), IntegerLiteral(0)))])])"
+    assert str(ASTGenerator(source).generate()) == expected
+
+
+def test_103():
+    """Test function type annotation"""
+    source = """const processor: int -> string = func(x: int) -> string { return "result"; };"""
+    expected = "Program(consts=[ConstDecl(processor, int, FuncDecl(, [Param(x, int)], string, [ReturnStmt(StringLiteral('result'))]))])"
+    assert str(ASTGenerator(source).generate()) == expected
+
+
+def test_104():
+    """Test complex function type with multiple parameters"""
+    source = """func higher_order(f: (int, bool) -> string) -> void {
+        let result = f(42, true);
+    }"""
+    expected = "Program(funcs=[FuncDecl(higher_order, [Param(f, void)], void, [VarDecl(result, FunctionCall(Identifier(f), [IntegerLiteral(42), BooleanLiteral(True)]))])])"
+    assert str(ASTGenerator(source).generate()) == expected
+
+
+def test_105():
+    """Test nested function calls with multiple arguments"""
+    source = """func main() -> void {
+        let result = outer(inner(1, 2), middle(3, 4, 5));
+    }"""
+    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(result, FunctionCall(Identifier(outer), [FunctionCall(Identifier(inner), [IntegerLiteral(1), IntegerLiteral(2)]), FunctionCall(Identifier(middle), [IntegerLiteral(3), IntegerLiteral(4), IntegerLiteral(5)])]))])])"
+    assert str(ASTGenerator(source).generate()) == expected
+
+
+def test_106():
+    """Test complex pipeline expression with multiple stages"""
+    source = """func main() -> void {
+        let result = input >> validate >> transform >> output;
+    }"""
+    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(result, BinaryOp(BinaryOp(BinaryOp(Identifier(input), >>, Identifier(validate)), >>, Identifier(transform)), >>, Identifier(output)))])])"
+    assert str(ASTGenerator(source).generate()) == expected
+
+
+def test_107():
+    """Test multi-dimensional array access and assignment"""
+    source = """func main() -> void {
+        let matrix: [[int; 3]; 2] = [[1, 2, 3], [4, 5, 6]];
+        matrix[0][1] = 10;
+    }"""
+    expected = "Program(funcs=[FuncDecl(main, [], void, [VarDecl(matrix, [[int; 3]; 2], ArrayLiteral([ArrayLiteral([IntegerLiteral(1), IntegerLiteral(2), IntegerLiteral(3)]), ArrayLiteral([IntegerLiteral(4), IntegerLiteral(5), IntegerLiteral(6)])])), Assignment(ArrayAccessLValue(ArrayAccess(Identifier(matrix), IntegerLiteral(0)), IntegerLiteral(1)), IntegerLiteral(10))])])"
+    assert str(ASTGenerator(source).generate()) == expected
+
+
+def test_108():
+    """Test else-if chain with multiple conditions"""
+    source = """func classify(x: int) -> string {
+        if (x < 0) {
+            return "negative";
+        } else if (x == 0) {
+            return "zero";
+        } else if (x > 100) {
+            return "large";
+        } else {
+            return "positive";
+        }
+    }"""
+    expected = "Program(funcs=[FuncDecl(classify, [Param(x, int)], string, [IfStmt(condition=BinaryOp(Identifier(x), <, IntegerLiteral(0)), then_stmt=BlockStmt([ReturnStmt(StringLiteral('negative'))]), elif_branches=[(BinaryOp(Identifier(x), ==, IntegerLiteral(0)), BlockStmt([ReturnStmt(StringLiteral('zero'))])), (BinaryOp(Identifier(x), >, IntegerLiteral(100)), BlockStmt([ReturnStmt(StringLiteral('large'))]))], else_stmt=BlockStmt([ReturnStmt(StringLiteral('positive'))]))])])"
+    assert str(ASTGenerator(source).generate()) == expected
+
+
+def test_109():
+    """Test mixed constant and function declarations with complex expressions"""
+    source = """const THRESHOLD: float = 3.14159 * 2.0;
+    const ENABLED: bool = true && !false;
+    func calculate(base: float) -> float {
+        return base * THRESHOLD;
+    }"""
+    expected = "Program(consts=[ConstDecl(THRESHOLD, float, BinaryOp(FloatLiteral(3.14159), *, FloatLiteral(2.0))), ConstDecl(ENABLED, bool, BinaryOp(BooleanLiteral(True), &&, UnaryOp(!, BooleanLiteral(False))))], funcs=[FuncDecl(calculate, [Param(base, float)], float, [ReturnStmt(BinaryOp(Identifier(base), *, Identifier(THRESHOLD)))])])"
+    assert str(ASTGenerator(source).generate()) == expected
+
+
+def test_110():
+    """Test function with void return type and complex control flow"""
+    source = """func process_data(arr: [int; 10]) -> void {
+        for (item in arr) {
+            if (item > 0) {
+                if (item % 2 == 0) {
+                    continue;
+                }
+                process(item);
+            } else {
+                break;
+            }
+        }
+    }"""
+    expected = "Program(funcs=[FuncDecl(process_data, [Param(arr, [int; 10])], void, [ForStmt(item, Identifier(arr), BlockStmt([IfStmt(condition=BinaryOp(Identifier(item), >, IntegerLiteral(0)), then_stmt=BlockStmt([IfStmt(condition=BinaryOp(BinaryOp(Identifier(item), %, IntegerLiteral(2)), ==, IntegerLiteral(0)), then_stmt=BlockStmt([ContinueStmt()])), ExprStmt(FunctionCall(Identifier(process), [Identifier(item)]))]), else_stmt=BlockStmt([BreakStmt()]))]))])])"
+    assert str(ASTGenerator(source).generate()) == expected
+

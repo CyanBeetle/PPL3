@@ -1,4 +1,4 @@
-# Generated from c:/Users/admin/Desktop/PPL_Assignment/hlang-compiler/src/grammar/HLang.g4 by ANTLR 4.13.1
+# Generated from c:/Users/admin/Desktop/hlang-compiler/src/grammar/HLang.g4 by ANTLR 4.13.1
 from antlr4 import *
 if "." in __name__:
     from .HLangParser import HLangParser
@@ -59,6 +59,24 @@ class HLangListener(ParseTreeListener):
 
     # Exit a parse tree produced by HLangParser#type.
     def exitType(self, ctx:HLangParser.TypeContext):
+        pass
+
+
+    # Enter a parse tree produced by HLangParser#functionType.
+    def enterFunctionType(self, ctx:HLangParser.FunctionTypeContext):
+        pass
+
+    # Exit a parse tree produced by HLangParser#functionType.
+    def exitFunctionType(self, ctx:HLangParser.FunctionTypeContext):
+        pass
+
+
+    # Enter a parse tree produced by HLangParser#atomicType.
+    def enterAtomicType(self, ctx:HLangParser.AtomicTypeContext):
+        pass
+
+    # Exit a parse tree produced by HLangParser#atomicType.
+    def exitAtomicType(self, ctx:HLangParser.AtomicTypeContext):
         pass
 
 
@@ -266,6 +284,15 @@ class HLangListener(ParseTreeListener):
 
     # Exit a parse tree produced by HLangParser#arrayLiteral.
     def exitArrayLiteral(self, ctx:HLangParser.ArrayLiteralContext):
+        pass
+
+
+    # Enter a parse tree produced by HLangParser#functionExpr.
+    def enterFunctionExpr(self, ctx:HLangParser.FunctionExprContext):
+        pass
+
+    # Exit a parse tree produced by HLangParser#functionExpr.
+    def exitFunctionExpr(self, ctx:HLangParser.FunctionExprContext):
         pass
 
 

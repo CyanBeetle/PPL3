@@ -262,11 +262,25 @@ class ASTGeneration(HLangVisitor):
         
         # Build left-associative equality operations
         result = self.visit(ctx.relationalExpr(0))
+        
+        # Get all children to find operator tokens
+        op_index = 1  # Start after first relationalExpr
         for i in range(1, len(ctx.relationalExpr())):
-            # Get the operator token
-            operator = '==' if ctx.EQ(i-1) else '!='
+            # Find the operator token in the children
+            while op_index < len(ctx.children):
+                child = ctx.children[op_index]
+                if hasattr(child, 'symbol') and child.symbol:
+                    if child.symbol.text == '==':
+                        operator = '=='
+                        break
+                    elif child.symbol.text == '!=':
+                        operator = '!='
+                        break
+                op_index += 1
+            
             right = self.visit(ctx.relationalExpr(i))
             result = BinaryOp(result, operator, right)
+            op_index += 1  # Move to next operator position
         
         return result
 
@@ -277,19 +291,31 @@ class ASTGeneration(HLangVisitor):
         
         # Build left-associative relational operations
         result = self.visit(ctx.additiveExpr(0))
+        
+        # Get all children to find operator tokens
+        op_index = 1  # Start after first additiveExpr
         for i in range(1, len(ctx.additiveExpr())):
-            # Determine operator
-            if ctx.LT(i-1):
-                operator = '<'
-            elif ctx.LE(i-1):
-                operator = '<='
-            elif ctx.GT(i-1):
-                operator = '>'
-            else:  # GE
-                operator = '>='
+            # Find the operator token in the children
+            while op_index < len(ctx.children):
+                child = ctx.children[op_index]
+                if hasattr(child, 'symbol') and child.symbol:
+                    if child.symbol.text == '<':
+                        operator = '<'
+                        break
+                    elif child.symbol.text == '<=':
+                        operator = '<='
+                        break
+                    elif child.symbol.text == '>':
+                        operator = '>'
+                        break
+                    elif child.symbol.text == '>=':
+                        operator = '>='
+                        break
+                op_index += 1
             
             right = self.visit(ctx.additiveExpr(i))
             result = BinaryOp(result, operator, right)
+            op_index += 1  # Move to next operator position
         
         return result
 
@@ -300,10 +326,25 @@ class ASTGeneration(HLangVisitor):
         
         # Build left-associative additive operations
         result = self.visit(ctx.multiplicativeExpr(0))
+        
+        # Get all children to find operator tokens
+        op_index = 1  # Start after first multiplicativeExpr
         for i in range(1, len(ctx.multiplicativeExpr())):
-            operator = '+' if ctx.PLUS(i-1) else '-'
+            # Find the operator token in the children
+            while op_index < len(ctx.children):
+                child = ctx.children[op_index]
+                if hasattr(child, 'symbol') and child.symbol:
+                    if child.symbol.text == '+':
+                        operator = '+'
+                        break
+                    elif child.symbol.text == '-':
+                        operator = '-'
+                        break
+                op_index += 1
+            
             right = self.visit(ctx.multiplicativeExpr(i))
             result = BinaryOp(result, operator, right)
+            op_index += 1  # Move to next operator position
         
         return result
 
@@ -314,16 +355,28 @@ class ASTGeneration(HLangVisitor):
         
         # Build left-associative multiplicative operations
         result = self.visit(ctx.unaryExpr(0))
+        
+        # Get all children to find operator tokens
+        op_index = 1  # Start after first unaryExpr
         for i in range(1, len(ctx.unaryExpr())):
-            if ctx.MULT(i-1):
-                operator = '*'
-            elif ctx.DIV(i-1):
-                operator = '/'
-            else:  # MOD
-                operator = '%'
+            # Find the operator token in the children
+            while op_index < len(ctx.children):
+                child = ctx.children[op_index]
+                if hasattr(child, 'symbol') and child.symbol:
+                    if child.symbol.text == '*':
+                        operator = '*'
+                        break
+                    elif child.symbol.text == '/':
+                        operator = '/'
+                        break
+                    elif child.symbol.text == '%':
+                        operator = '%'
+                        break
+                op_index += 1
             
             right = self.visit(ctx.unaryExpr(i))
             result = BinaryOp(result, operator, right)
+            op_index += 1  # Move to next operator position
         
         return result
 

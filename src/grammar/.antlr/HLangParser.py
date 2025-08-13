@@ -1,4 +1,4 @@
-# Generated from c:/Users/admin/Desktop/PPL_Assignment/hlang-compiler/src/grammar/HLang.g4 by ANTLR 4.13.1
+# Generated from c:/Users/admin/Desktop/hlang-compiler/src/grammar/HLang.g4 by ANTLR 4.13.1
 # encoding: utf-8
 from antlr4 import *
 from io import StringIO
