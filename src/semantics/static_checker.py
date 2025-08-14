@@ -4,7 +4,6 @@ Static Semantic Checker for HLang Programming Language
 
 from functools import reduce
 from typing import Dict, List, Set, Optional, Any, Tuple, Union, NamedTuple
-from enum import Enum
 from ..utils.visitor import ASTVisitor
 from ..utils.nodes import (
     ASTNode, Program, ConstDecl, FuncDecl, Param, VarDecl, Assignment, 
@@ -28,8 +27,8 @@ from .static_error import Identifier as IdentifierMarker, Function as FunctionMa
 # TASK 3.1: Symbol Table Design & Implementation
 # ============================================================================
 
-class SymbolKind(Enum):
-    """Enumeration for different kinds of symbols."""
+class SymbolKind:
+    """Constants for different kinds of symbols."""
     VARIABLE = "Variable"
     CONSTANT = "Constant"
     FUNCTION = "Function"
@@ -990,9 +989,14 @@ class StaticChecker(ASTVisitor):
         for const_decl in node.const_decls:
             self.visit(const_decl)
         
-        # Task 3.5: Process function declarations
+        # Task 3.5: Process function declarations (two-pass approach)
+        # First pass: Register all function signatures for forward declarations
         for func_decl in node.func_decls:
-            self.visit(func_decl)
+            self.register_function_signature(func_decl)
+        
+        # Second pass: Check function bodies
+        for func_decl in node.func_decls:
+            self.check_function_body(func_decl)
         
         # Task 3.6: Check for main function
         if not self.main_function_found:
@@ -1188,6 +1192,128 @@ class StaticChecker(ASTVisitor):
         
         return return_type
     
+    def register_function_signature(self, node: "FuncDecl"):
+        """
+        Register function signature in the symbol table (first pass).
+        """
+        # Check for redeclaration in global scope
+        if self.symbol_table.lookup_current_scope(node.name):
+            self.add_error_at_node(
+                Redeclared("Function", node.name),
+                node
+            )
+            return
+        
+        # Check if this is the main function (Task 3.6)
+        if node.name == "main":
+            if self.main_function_found:
+                # Multiple main functions
+                self.add_error_at_node(
+                    Redeclared("Function", "main"),
+                    node
+                )
+                return
+            
+            # Validate main function signature
+            if len(node.params) != 0:
+                # Main function should have no parameters
+                self.add_error_at_node(NoEntryPoint(), node)
+                return
+            
+            if not isinstance(node.return_type, VoidType):
+                # Main function should return void
+                self.add_error_at_node(NoEntryPoint(), node)
+                return
+            
+            self.main_function_found = True
+        
+        # Get return type
+        return_type = self.visit(node.return_type)
+        
+        # Process parameters and check for redeclaration
+        param_types = []
+        param_names = set()
+        
+        for param in node.params:
+            if param.name in param_names:
+                self.add_error_at_node(
+                    Redeclared("Parameter", param.name),
+                    param
+                )
+                continue
+            
+            param_names.add(param.name)
+            param_type = self.visit(param.param_type)
+            param_types.append(param_type)
+        
+        # Create function symbol info
+        function_info = {
+            'return_type': return_type,
+            'param_types': param_types,
+            'param_names': list(param_names)
+        }
+        
+        symbol_info = SymbolInfo(
+            name=node.name,
+            kind=SymbolKind.FUNCTION,
+            type_info=function_info,
+            line=getattr(node, 'line', None),
+            column=getattr(node, 'column', None)
+        )
+        
+        if not self.symbol_table.declare(symbol_info):
+            self.add_error_at_node(
+                Redeclared("Function", node.name),
+                node
+            )
+
+    def check_function_body(self, node: "FuncDecl"):
+        """
+        Check function body implementation (second pass).
+        """
+        # Get function signature from symbol table
+        func_symbol = self.symbol_table.lookup(node.name)
+        if func_symbol is None:
+            return  # Error already reported in first pass
+        
+        function_info = func_symbol.type_info
+        return_type = function_info['return_type']
+        
+        # Enter function scope for body analysis
+        self.symbol_table.enter_scope(f"function_{node.name}")
+        
+        # Store current function return type for return statement checking
+        previous_return_type = self.current_function_return_type
+        self.current_function_return_type = return_type
+        
+        # Register parameters in function scope
+        for param in node.params:
+            param_type = self.visit(param.param_type)
+            param_symbol = SymbolInfo(
+                name=param.name,
+                kind=SymbolKind.PARAMETER,
+                type_info=param_type,
+                line=getattr(param, 'line', None),
+                column=getattr(param, 'column', None)
+            )
+            self.symbol_table.declare(param_symbol)
+        
+        # Process function body
+        for stmt in node.body:
+            self.visit(stmt)
+        
+        # Check return path analysis for non-void functions (Task 3.18)
+        if not isinstance(return_type, VoidType):
+            if not self.check_all_paths_return(node.body, return_type):
+                self.add_error_at_node(
+                    TypeMismatchInStatement(node),
+                    node
+                )
+        
+        # Restore previous function context
+        self.current_function_return_type = previous_return_type
+        self.symbol_table.exit_scope()
+
     def visit_param(self, node: "Param", o: Any = None):
         """
         Visit parameter - part of Task 3.5.
@@ -1228,22 +1354,36 @@ class StaticChecker(ASTVisitor):
             )
             return
         
-        # Check for shadowing of functions (forbidden)
+        # Check for shadowing of functions and constants (forbidden)
         existing_symbol = self.symbol_table.lookup(node.name)
-        if existing_symbol and existing_symbol.kind == SymbolKind.FUNCTION:
-            self.add_error_at_node(
-                Redeclared("Variable", node.name),
-                node
-            )
-            return
+        if existing_symbol:
+            if existing_symbol.kind == SymbolKind.FUNCTION:
+                self.add_error_at_node(
+                    Redeclared("Variable", node.name),
+                    node
+                )
+                return
+            elif existing_symbol.kind == SymbolKind.CONSTANT:
+                self.add_error_at_node(
+                    Redeclared("Constant", node.name),
+                    node
+                )
+                return
         
         # Evaluate initialization expression to get its type
         init_type = None
         if node.value:
+            # Special case: Empty array literal cannot be inferred without type annotation
+            if isinstance(node.value, ArrayLiteral) and not node.value.elements and not node.type_annotation:
+                self.add_error_at_node(
+                    TypeCannotBeInferred(node),
+                    node
+                )
+                return
+            
             init_type = self.visit(node.value)
             if init_type is None:
-                # Error in initialization expression, already reported
-                return
+                return  # Error already reported in expression
             
             # Check if trying to assign void type (forbidden)
             if isinstance(init_type, VoidType):
@@ -1409,6 +1549,19 @@ class StaticChecker(ASTVisitor):
         self.loop_depth += 1
         self.symbol_table.enter_scope("for_body")
         
+        # Check for variable shadowing before registering loop variable
+        existing_symbol = self.symbol_table.lookup(node.variable)
+        if existing_symbol and existing_symbol.kind == SymbolKind.PARAMETER:
+            # Loop variable shadows a parameter
+            self.add_error_at_node(
+                Redeclared("Variable", node.variable),
+                node
+            )
+            # Exit loop context on error
+            self.symbol_table.exit_scope()
+            self.loop_depth -= 1
+            return
+        
         # Register loop variable with element type
         if collection_type and self.is_array_type(collection_type):
             element_type = self.get_array_element_type(collection_type)
@@ -1475,12 +1628,42 @@ class StaticChecker(ASTVisitor):
             if isinstance(node.expr.function, Identifier):
                 function_name = node.expr.function.name
                 func_symbol = self.symbol_table.lookup(function_name)
-                if func_symbol is None or func_symbol.kind != SymbolKind.FUNCTION:
+                if func_symbol is None:
                     self.add_error_at_node(
                         TypeMismatchInStatement(node),
                         node
                     )
                     return None
+                elif func_symbol.kind != SymbolKind.FUNCTION:
+                    self.add_error_at_node(
+                        TypeMismatchInStatement(node),
+                        node
+                    )
+                    return None
+                else:
+                    # Check function call compatibility in statement context
+                    func_info = func_symbol.type_info
+                    expected_param_types = func_info['param_types']
+                    
+                    # Check argument count and types
+                    if len(node.expr.args) != len(expected_param_types):
+                        self.add_error_at_node(
+                            TypeMismatchInStatement(node.expr),
+                            node
+                        )
+                        return None
+                    
+                    # Check argument types
+                    for i, (arg, expected_type) in enumerate(zip(node.expr.args, expected_param_types)):
+                        arg_type = self.visit(arg)
+                        if arg_type and not self.are_types_equal(arg_type, expected_type):
+                            self.add_error_at_node(
+                                TypeMismatchInStatement(node.expr),
+                                node
+                            )
+                            return None
+                    
+                    return func_info['return_type']
         
         return self.visit(node.expr)
     
@@ -1593,8 +1776,9 @@ class StaticChecker(ASTVisitor):
             return None
         
         if func_symbol.kind != SymbolKind.FUNCTION:
+            # Trying to call a variable as a function
             self.add_error_at_node(
-                Undeclared(FunctionMarker(), function_name),
+                TypeMismatchInExpression(node),
                 node
             )
             return None
@@ -1653,11 +1837,7 @@ class StaticChecker(ASTVisitor):
     def visit_array_literal(self, node: "ArrayLiteral", o: Any = None):
         """Visit array literal - Task 3.15."""
         if not node.elements:
-            # Empty array - cannot infer type
-            self.add_error_at_node(
-                TypeCannotBeInferred(node),
-                node
-            )
+            # Empty array - cannot infer type, return None and let parent handle error
             return None
         
         # Infer type from elements
