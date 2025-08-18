@@ -186,10 +186,30 @@ class CodeGenerator(ASTVisitor):
         return new_o
 
     def visit_assignment(self, node: "Assignment", o: SubBody = None):
-        rc, rt = self.visit(node.value, Access(o.frame, o.sym))
-        self.emit.print_out(rc)
-        lc, lt = self.visit(node.lvalue, Access(o.frame, o.sym))
-        self.emit.print_out(lc)
+        """Generate code for assignment operations."""
+        # Different handling based on lvalue type
+        if isinstance(node.lvalue, ArrayAccessLValue):
+            # Array assignment: array[index] = value
+            # Generate lvalue code (array ref + index)
+            lc, lt = self.visit(node.lvalue, Access(o.frame, o.sym))
+            
+            # Generate value code
+            rc, rt = self.visit(node.value, Access(o.frame, o.sym))
+            
+            # Emit the code: array ref, index, value, then store
+            self.emit.print_out(lc)  # array ref + index
+            self.emit.print_out(rc)  # value
+            
+            # Emit array store instruction
+            store_code = self.emit.emit_astore(lt, o.frame)
+            self.emit.print_out(store_code)
+        else:
+            # Regular variable assignment
+            rc, rt = self.visit(node.value, Access(o.frame, o.sym))
+            self.emit.print_out(rc)
+            lc, lt = self.visit(node.lvalue, Access(o.frame, o.sym))
+            self.emit.print_out(lc)
+        
         return o
 
     def visit_if_stmt(self, node: "IfStmt", o: SubBody = None):
@@ -267,9 +287,86 @@ class CodeGenerator(ASTVisitor):
         return o
 
     def visit_for_stmt(self, node: "ForStmt", o: SubBody = None):
-        # Simplified for loop implementation
-        # For now, we'll skip complex array iteration and focus on basic structure
-        # TODO: Implement full array iteration support
+        """Generate code for for-each loop over arrays."""
+        # Generate code for the iterable (array)
+        iterable_code, iterable_type = self.visit(node.iterable, Access(o.frame, o.sym))
+        
+        # Verify it's an array type
+        if not isinstance(iterable_type, ArrayType):
+            raise IllegalOperandException("For-each loop requires array type")
+        
+        element_type = iterable_type.element_type
+        array_size = iterable_type.size
+        
+        # Set up loop variables
+        o.frame.enter_loop()
+        start_label = o.frame.get_new_label()
+        continue_label = o.frame.get_continue_label()
+        break_label = o.frame.get_break_label()
+        
+        # Allocate local variables for loop control
+        array_idx = o.frame.get_new_index()  # Store array reference
+        index_idx = o.frame.get_new_index()  # Loop index counter
+        element_idx = o.frame.get_new_index() # Current element (loop variable)
+        
+        # Create new symbol table with loop variable
+        loop_var_symbol = Symbol(node.loop_var, element_type, Index(element_idx))
+        new_sym = [loop_var_symbol] + o.sym
+        new_o = SubBody(o.frame, new_sym)
+        
+        # Generate code
+        code = ""
+        
+        # Store array reference
+        code += iterable_code
+        code += self.emit.emit_write_var("", iterable_type, array_idx, o.frame)
+        
+        # Initialize loop index to 0
+        code += self.emit.emit_push_iconst(0, o.frame)
+        code += self.emit.emit_write_var("", IntType(), index_idx, o.frame)
+        
+        # Start loop label
+        code += self.emit.emit_label(start_label, o.frame)
+        
+        # Check loop condition: if index < array_size continue, else break
+        body_label = o.frame.get_new_label()
+        code += self.emit.emit_read_var("", IntType(), index_idx, o.frame)  # load index
+        code += self.emit.emit_push_iconst(array_size, o.frame)  # load array size
+        code += self.emit.emit_ificmplt(body_label, o.frame)  # if index < size, continue to body
+        code += self.emit.emit_goto(break_label, o.frame)  # else break
+        
+        # Body label - load current element and execute body
+        code += self.emit.emit_label(body_label, o.frame)
+        
+        # Load current element: array[index]
+        code += self.emit.emit_read_var("", iterable_type, array_idx, o.frame)  # load array
+        code += self.emit.emit_read_var("", IntType(), index_idx, o.frame)  # load index
+        code += self.emit.emit_aload(element_type, o.frame)  # load array[index]
+        code += self.emit.emit_write_var(node.loop_var, element_type, element_idx, o.frame)  # store in loop var
+        
+        self.emit.print_out(code)
+        
+        # Generate body code
+        self.visit(node.body, new_o)
+        
+        # Continue label (increment index and loop back)
+        self.emit.print_out(self.emit.emit_label(continue_label, o.frame))
+        
+        # Increment index: index = index + 1
+        increment_code = ""
+        increment_code += self.emit.emit_read_var("", IntType(), index_idx, o.frame)
+        increment_code += self.emit.emit_push_iconst(1, o.frame)
+        increment_code += self.emit.emit_add_op("+", IntType(), o.frame)
+        increment_code += self.emit.emit_write_var("", IntType(), index_idx, o.frame)
+        
+        # Jump back to start
+        increment_code += self.emit.emit_goto(start_label, o.frame)
+        self.emit.print_out(increment_code)
+        
+        # Break label (end of loop)
+        self.emit.print_out(self.emit.emit_label(break_label, o.frame))
+        
+        o.frame.exit_loop()
         return o
 
     def visit_return_stmt(self, node: "ReturnStmt", o: SubBody = None):
@@ -330,23 +427,23 @@ class CodeGenerator(ASTVisitor):
         return code, sym.type
 
     def visit_array_access_lvalue(self, node: "ArrayAccessLValue", o: Access = None):
-        # Generate code for array
-        array_code, array_type = self.visit(node.array, Access(o.frame, o.sym))
+        """Generate code for array element assignment (lvalue)."""
+        # Generate code for array reference
+        array_code, array_type = self.visit(node.array, o)
         
         # Generate code for index
-        index_code, index_type = self.visit(node.index, Access(o.frame, o.sym))
+        index_code, index_type = self.visit(node.index, o)
         
-        # Get element type
-        if type(array_type) is ArrayType:
-            element_type = array_type.element_type
-        else:
+        # Verify array type
+        if not isinstance(array_type, ArrayType):
             raise IllegalOperandException("Array access on non-array type")
         
-        # For lvalue, we need to prepare for store operation
-        # Emit array and index code, but leave values on stack for astore
+        element_type = array_type.element_type
+        
+        # For assignment, we prepare array reference and index on stack
+        # The assignment visitor will add the value and emit the store instruction
         combined_code = array_code + index_code
         
-        # The actual store will be handled by the assignment
         return combined_code, element_type
 
     # Expressions
@@ -439,19 +536,20 @@ class CodeGenerator(ASTVisitor):
         )
 
     def visit_array_access(self, node: "ArrayAccess", o: Access = None):
+        """Generate code for array element access."""
         # Generate code for array
-        array_code, array_type = self.visit(node.array, Access(o.frame, o.sym))
+        array_code, array_type = self.visit(node.array, o)
         
         # Generate code for index
-        index_code, index_type = self.visit(node.index, Access(o.frame, o.sym))
+        index_code, index_type = self.visit(node.index, o)
         
-        # Get element type
-        if type(array_type) is ArrayType:
-            element_type = array_type.element_type
-        else:
+        # Verify array type
+        if not isinstance(array_type, ArrayType):
             raise IllegalOperandException("Array access on non-array type")
         
-        # Emit array and index loading
+        element_type = array_type.element_type
+        
+        # Combine codes: array reference, then index, then load
         combined_code = array_code + index_code
         
         # Emit array load instruction
@@ -460,9 +558,59 @@ class CodeGenerator(ASTVisitor):
         return combined_code + aload_code, element_type
 
     def visit_array_literal(self, node: "ArrayLiteral", o: Access = None):
-        # Simplified array literal implementation
-        # TODO: Implement full array literal support with element type inference
-        return "", ArrayType(IntType(), len(node.elements))  # Default to int array
+        """Generate code for array literal creation."""
+        if not node.elements:
+            # Empty array - just create an array of size 0
+            # We need to determine the element type from context
+            return self.emit.emit_push_iconst(0, o.frame) + self.emit.emit_new_array("I"), ArrayType(IntType(), 0)
+        
+        # Generate code to create array
+        array_size = len(node.elements)
+        
+        # Infer element type from first element
+        first_element_code, element_type = self.visit(node.elements[0], o)
+        
+        # Determine JVM array type
+        if type(element_type) is IntType:
+            jvm_type = "int"
+        elif type(element_type) is FloatType:
+            jvm_type = "float" 
+        elif type(element_type) is BoolType:
+            jvm_type = "int"  # Booleans stored as integers
+        elif type(element_type) is StringType:
+            jvm_type = "java/lang/String"
+        else:
+            raise IllegalOperandException(f"Unsupported array element type: {type(element_type)}")
+        
+        # Generate code to create and populate array
+        code = ""
+        
+        # Push array size
+        code += self.emit.emit_push_iconst(array_size, o.frame)
+        
+        # Create array (use newarray for primitives, anewarray for objects)
+        if type(element_type) in [IntType, FloatType, BoolType]:
+            code += self.emit.emit_new_array(jvm_type)
+        else:
+            # Use anewarray for object types (strings, etc.)
+            code += self.emit.jvm.emitANEWARRAY(jvm_type)
+        
+        # Populate array elements
+        for i, element in enumerate(node.elements):
+            # Duplicate array reference for assignment
+            code += self.emit.emit_dup(o.frame)
+            
+            # Push index
+            code += self.emit.emit_push_iconst(i, o.frame)
+            
+            # Generate element value
+            element_code, _ = self.visit(element, o)
+            code += element_code
+            
+            # Store element in array
+            code += self.emit.emit_astore(element_type, o.frame)
+        
+        return code, ArrayType(element_type, array_size)
 
     def visit_identifier(self, node: "Identifier", o: Access = None):
         # Look up identifier in symbol table

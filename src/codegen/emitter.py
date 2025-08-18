@@ -535,7 +535,7 @@ class Emitter:
 
     def emit_mul_op(self, lexeme: str, in_, frame) -> str:
         """
-        Generate imul, idiv, fmul or fdiv.
+        Generate imul, idiv, irem, fmul or fdiv.
 
         Args:
             lexeme: The lexeme of the operator
@@ -551,11 +551,19 @@ class Emitter:
                 return self.jvm.emitIMUL()
             else:
                 return self.jvm.emitFMUL()
-        else:
+        elif lexeme == "/":
             if type(in_) is IntType:
                 return self.jvm.emitIDIV()
             else:
                 return self.jvm.emitFDIV()
+        elif lexeme == "%":
+            if type(in_) is IntType:
+                return self.jvm.emitIREM()
+            else:
+                # Float modulo is not supported in Java bytecode, use frem
+                return self.jvm.emitFREM()
+        else:
+            raise ValueError(f"Unknown multiplication operator: {lexeme}")
 
     def emit_div(self, frame) -> str:
         """
@@ -738,7 +746,7 @@ class Emitter:
         Returns:
             Tuple of (value, type)
         """
-        if type(ast) is IntLiteral:
+        if type(ast) is IntegerLiteral:
             return (str(ast.value), IntType())
 
     def emit_if_true(self, label: int, frame) -> str:

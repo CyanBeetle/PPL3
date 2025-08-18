@@ -5,34 +5,22 @@
 .method public static main([Ljava/lang/String;)V
 .var 0 is args [Ljava/lang/String; from Label0 to Label1
 Label0:
-.var 1 is a I from Label0 to Label1
-	iconst_5
-	istore_1
-.var 2 is b I from Label0 to Label1
-	iconst_3
-	istore_2
-.var 3 is c I from Label0 to Label1
-	bipush 10
-	istore_3
-.var 4 is d I from Label0 to Label1
-	iconst_2
-	istore 4
-.var 5 is result I from Label0 to Label1
-	iload_1
-	iload_2
-	iadd
-	iload_3
-	iload 4
-	isub
-	imul
-	istore 5
-	iload 5
-	invokestatic io/int2str(I)Ljava/lang/String;
+.var 1 is singleton [Ljava/lang/String; from Label0 to Label1
+	iconst_1
+	anewarray java/lang/String
+	dup
+	iconst_0
+	ldc "alone"
+	aastore
+	astore_1
+	aload_1
+	iconst_0
+	aaload
 	invokestatic io/print(Ljava/lang/String;)V
 	return
 Label1:
-.limit stack 3
-.limit locals 6
+.limit stack 5
+.limit locals 2
 .end method
 
 .method public <init>()V
