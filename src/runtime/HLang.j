@@ -5,21 +5,31 @@
 .method public static main([Ljava/lang/String;)V
 .var 0 is args [Ljava/lang/String; from Label0 to Label1
 Label0:
-.var 1 is singleton [Ljava/lang/String; from Label0 to Label1
+	iconst_5
+	iconst_3
+	if_icmpne Label2
 	iconst_1
-	anewarray java/lang/String
-	dup
+	goto Label3
+Label2:
 	iconst_0
-	ldc "alone"
-	aastore
-	astore_1
-	aload_1
+Label3:
+	ifgt Label4
+	iconst_1
+	goto Label5
+Label4:
 	iconst_0
-	aaload
+Label5:
+	istore_1
+	iload_1
+	ifle Label6
+Label8:
+	ldc "not equal"
 	invokestatic io/print(Ljava/lang/String;)V
+Label9:
+Label6:
 	return
 Label1:
-.limit stack 5
+.limit stack 6
 .limit locals 2
 .end method
 

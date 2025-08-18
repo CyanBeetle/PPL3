@@ -1805,7 +1805,7 @@ def test_048():
                                 )
                             ),
                             Assignment(
-                                Identifier("i"),
+                                IdLValue("i"),
                                 BinaryOp(Identifier("i"), "+", IntegerLiteral(1))  # i = i + 1
                             )
                         ])
@@ -1876,7 +1876,7 @@ def test_050():
                                 )
                             ),
                             Assignment(
-                                Identifier("count"),
+                                IdLValue("count"),
                                 BinaryOp(Identifier("count"), "+", IntegerLiteral(1))
                             ),
                             IfStmt(
@@ -1911,7 +1911,7 @@ def test_051():
                         BinaryOp(Identifier("i"), "<", IntegerLiteral(5)),
                         BlockStmt([
                             Assignment(
-                                Identifier("i"),
+                                IdLValue("i"),
                                 BinaryOp(Identifier("i"), "+", IntegerLiteral(1))
                             ),
                             IfStmt(
@@ -1974,13 +1974,13 @@ def test_052():
                                         )
                                     ),
                                     Assignment(
-                                        Identifier("inner"),
+                                        IdLValue("inner"),
                                         BinaryOp(Identifier("inner"), "+", IntegerLiteral(1))
                                     )
                                 ])
                             ),
                             Assignment(
-                                Identifier("outer"),
+                                IdLValue("outer"),
                                 BinaryOp(Identifier("outer"), "+", IntegerLiteral(1))
                             )
                         ])
@@ -2181,7 +2181,7 @@ def test_058():
                         )
                     ),
                     Assignment(
-                        Identifier("counter"),
+                        IdLValue("counter"),
                         IntegerLiteral(42)  # counter = 42;
                     ),
                     ExprStmt(
@@ -3314,7 +3314,7 @@ def test_084():
                         Identifier("numbers"),
                         BlockStmt([
                             Assignment(
-                                Identifier("total"),
+                                IdLValue("total"),
                                 BinaryOp(Identifier("total"), "+", Identifier("num"))
                             )
                         ])
@@ -3366,11 +3366,11 @@ def test_085():
                         BinaryOp(Identifier("i"), "<", Identifier("count")),
                         BlockStmt([
                             Assignment(
-                                ArrayAccess(Identifier("result"), Identifier("i")),
+                                ArrayAccessLValue(Identifier("result"), Identifier("i")),
                                 BinaryOp(Identifier("start"), "+", Identifier("i"))
                             ),
                             Assignment(
-                                Identifier("i"),
+                                IdLValue("i"),
                                 BinaryOp(Identifier("i"), "+", IntegerLiteral(1))
                             )
                         ])
@@ -3637,7 +3637,7 @@ def test_090():
                         Identifier("scores"),
                         BlockStmt([
                             Assignment(
-                                Identifier("total"),
+                                IdLValue("total"),
                                 BinaryOp(Identifier("total"), "+", Identifier("score"))
                             )
                         ])
@@ -4037,11 +4037,11 @@ def test_098():
                         )
                     ),
                     Assignment(
-                        Identifier("row"),
+                        IdLValue("row"),
                         IntegerLiteral(0)
                     ),
                     Assignment(
-                        Identifier("col"),
+                        IdLValue("col"),
                         IntegerLiteral(1)
                     ),
                     ExprStmt(
@@ -4248,7 +4248,8 @@ def test_102():
                 [
                     ExprStmt(
                         FunctionCall(
-                            Identifier("print"), [FloatLiteral(-0.0)]
+                            Identifier("print"), 
+                            [FunctionCall(Identifier("float2str"), [FloatLiteral(-0.0)])]
                         )
                     )
                 ],
@@ -4308,7 +4309,7 @@ def test_104():
                 VoidType(),
                 [
                     VarDecl("result", IntType(), 
-                        BinaryOp("/", IntegerLiteral(15), IntegerLiteral(3))
+                        BinaryOp(IntegerLiteral(15), "/", IntegerLiteral(3))
                     ),
                     ExprStmt(
                         FunctionCall(
@@ -4336,7 +4337,7 @@ def test_105():
                 VoidType(),
                 [
                     VarDecl("text", StringType(),
-                        BinaryOp("+", StringLiteral("hello"), StringLiteral(""))
+                        BinaryOp(StringLiteral("hello"), "+", StringLiteral(""))
                     ),
                     ExprStmt(
                         FunctionCall(Identifier("print"), [Identifier("text")])
@@ -4454,7 +4455,7 @@ def test_109():
                 IntType(),
                 [
                     ReturnStmt(
-                        BinaryOp("*", Identifier("x"), IntegerLiteral(2))
+                        BinaryOp(Identifier("x"), "*", IntegerLiteral(2))
                     )
                 ],
             ),
@@ -4520,7 +4521,7 @@ def test_111():
                 VoidType(),
                 [
                     VarDecl("remainder", IntType(),
-                        BinaryOp("%", IntegerLiteral(10), IntegerLiteral(5))
+                        BinaryOp(IntegerLiteral(10), "%", IntegerLiteral(5))
                     ),
                     ExprStmt(
                         FunctionCall(
@@ -4549,7 +4550,7 @@ def test_112():
                 [
                     VarDecl("value", BoolType(),
                         UnaryOp("!", 
-                            BinaryOp("==", IntegerLiteral(5), IntegerLiteral(3))
+                            BinaryOp(IntegerLiteral(5), "==", IntegerLiteral(3))
                         )
                     ),
                     IfStmt(

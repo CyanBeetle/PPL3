@@ -24,11 +24,42 @@ class CodeGenerator(ASTVisitor):
     def visit_program(self, node: "Program", o: Any = None):
         self.emit.print_out(self.emit.emit_prolog(self.class_name, "java/lang/Object"))
 
-        global_env = reduce(
-            lambda acc, cur: self.visit(cur, acc),
-            node.func_decls,
-            SubBody(None, IO_SYMBOL_LIST),
-        )
+        # Handle global constants - emit as static fields
+        global_constants = []
+        for const in node.const_decls:
+            global_constants.append(Symbol(const.name, const.type_annotation, CName(self.class_name)))
+            self.emit.print_out(self.emit.emit_attribute(const.name, const.type_annotation, True))
+            
+        # Create static initializer for constants if any exist
+        if node.const_decls:
+            clinit_frame = Frame("<clinit>", VoidType())
+            self.emit.print_out(self.emit.emit_method("<clinit>", FunctionType([], VoidType()), True))
+            for const in node.const_decls:
+                value_code, value_type = self.visit(const.value, Access(clinit_frame, []))
+                self.emit.print_out(value_code)
+                self.emit.print_out(self.emit.emit_put_static(f"{self.class_name}/{const.name}", const.type_annotation, clinit_frame))
+            self.emit.print_out(self.emit.emit_return(VoidType(), clinit_frame))
+            self.emit.print_out(self.emit.emit_end_method(clinit_frame))
+
+        # First pass: collect all function signatures
+        function_symbols = []
+        for func in node.func_decls:
+            param_types = list(map(lambda x: x.param_type, func.params))
+            function_symbols.append(
+                Symbol(
+                    func.name,
+                    FunctionType(param_types, func.return_type),
+                    CName(self.class_name),
+                )
+            )
+        
+        # Complete symbol table with built-ins, constants, and user functions
+        complete_symbol_table = IO_SYMBOL_LIST + global_constants + function_symbols
+        
+        # Second pass: generate method bodies with complete symbol table
+        for func in node.func_decls:
+            frame = Frame(func.name, func.return_type)
+            self.generate_method(func, SubBody(frame, complete_symbol_table))
 
         self.generate_method(
             FuncDecl("<init>", [], VoidType(), []),
@@ -101,11 +132,32 @@ class CodeGenerator(ASTVisitor):
         frame.exit_scope()
 
     def visit_const_decl(self, node: "ConstDecl", o: Any = None):
-        # Constants are handled as static fields
-        # Generate static field declaration and initialization in class
-        # For now, we'll store constants in the symbol table but not emit static fields
-        # This is because static field initialization requires clinit method which is complex
-        return o
+        # Constants are handled as local variables for simplicity
+        # In a full implementation, these would be static fields
+        idx = o.frame.get_new_index()
+        
+        # Emit variable declaration
+        self.emit.print_out(
+            self.emit.emit_var(
+                idx,
+                node.name,
+                node.type_annotation,
+                o.frame.get_start_label(),
+                o.frame.get_end_label(),
+            )
+        )
+        
+        # Generate initialization code
+        if node.value is not None:
+            value_code, value_type = self.visit(node.value, Access(o.frame, o.sym))
+            self.emit.print_out(value_code)
+            self.emit.print_out(
+                self.emit.emit_write_var(node.name, node.type_annotation, idx, o.frame)
+            )
+        
+        # Add constant to symbol table as a local variable (Index)
+        new_sym = [Symbol(node.name, node.type_annotation, Index(idx))] + o.sym
+        return SubBody(o.frame, new_sym)
 
     def visit_func_decl(self, node: "FuncDecl", o: SubBody = None):
         frame = Frame(node.name, node.return_type)
@@ -164,25 +216,47 @@ class CodeGenerator(ASTVisitor):
 
     def visit_var_decl(self, node: "VarDecl", o: SubBody = None):
         idx = o.frame.get_new_index()
-        self.emit.print_out(
-            self.emit.emit_var(
-                idx,
-                node.name,
-                node.type_annotation,
-                o.frame.get_start_label(),
-                o.frame.get_end_label(),
-            )
-        )
+        
+        # Type inference: if type_annotation is None, infer from value
+        var_type = node.type_annotation
+        if var_type is None and node.value is not None:
+            # Evaluate the initializer to get its type using current symbol table
+            _, inferred_type = self.visit(node.value, Access(o.frame, o.sym))
+            var_type = inferred_type
+        
+        if var_type is None:
+            raise IllegalOperandException("Cannot infer type for variable: " + node.name)
+        
+        # Don't emit variable declaration immediately - Jasmin can infer from usage
+        # self.emit.print_out(
+        #     self.emit.emit_var(
+        #         idx,
+        #         node.name,
+        #         var_type,
+        #         o.frame.start_label[0],  # Use method-level start label
+        #         o.frame.end_label[0],   # Use method-level end label
+        #     )
+        # )
 
         # Create new symbol table with the declared variable
-        new_sym = [Symbol(node.name, node.type_annotation, Index(idx))] + o.sym
+        new_sym = [Symbol(node.name, var_type, Index(idx))] + o.sym
         new_o = SubBody(o.frame, new_sym)
 
         if node.value is not None:
-            self.visit(
-                Assignment(IdLValue(node.name), node.value),
-                new_o,
-            )
+            # Create a custom assignment that evaluates value with old symbol table
+            # but stores to new variable
+            rc, rt = self.visit(node.value, Access(o.frame, o.sym))  # old sym table
+            lc, lt = self.visit(IdLValue(node.name), Access(o.frame, new_sym))  # new sym table
+            
+            # Handle type conversion if needed
+            if type(rt) is IntType and type(lt) is FloatType:
+                rc += self.emit.emit_i2f(o.frame)
+            elif type(rt) is FloatType and type(lt) is IntType:
+                rc += self.emit.emit_f2i(o.frame)
+            
+            self.emit.print_out(rc)
+            self.emit.print_out(lc)
+            
         return new_o
 
     def visit_assignment(self, node: "Assignment", o: SubBody = None):
@@ -206,8 +280,25 @@ class CodeGenerator(ASTVisitor):
         else:
             # Regular variable assignment
             rc, rt = self.visit(node.value, Access(o.frame, o.sym))
+            
+            # Handle different lvalue types
+            if isinstance(node.lvalue, Identifier):
+                # Convert Identifier to IdLValue for assignment
+                lvalue = IdLValue(node.lvalue.name)
+            else:
+                lvalue = node.lvalue
+                
+            lc, lt = self.visit(lvalue, Access(o.frame, o.sym))
+            
+            # Handle type conversion if needed
+            if type(rt) is IntType and type(lt) is FloatType:
+                # Convert int to float
+                rc += self.emit.emit_i2f(o.frame)
+            elif type(rt) is FloatType and type(lt) is IntType:
+                # Convert float to int (truncation)
+                rc += self.emit.emit_f2i(o.frame)
+            
             self.emit.print_out(rc)
-            lc, lt = self.visit(node.lvalue, Access(o.frame, o.sym))
             self.emit.print_out(lc)
         
         return o
@@ -229,30 +320,60 @@ class CodeGenerator(ASTVisitor):
         # Generate then branch
         self.visit(node.then_stmt, o)
         
-        # Jump to end to skip other branches
-        if node.elif_branches or node.else_stmt:
+        # Check if we need end label (only if we have elif/else and don't end with return)
+        need_end_label = (node.elif_branches or node.else_stmt) and not self._ends_with_return(node.then_stmt)
+        
+        # Jump to end to skip other branches (only if needed)
+        if need_end_label:
             self.emit.print_out(self.emit.emit_goto(end_label, o.frame))
         
         # Emit false label
         self.emit.print_out(self.emit.emit_label(false_label, o.frame))
         
-        # Handle elif branches (recursive if statements)
-        if node.elif_branches:
-            # For simplicity, treat elif as nested if statements
-            for elif_cond, elif_stmt in node.elif_branches:
-                elif_if = IfStmt(elif_cond, elif_stmt, [], node.else_stmt)
-                self.visit(elif_if, o)
-                return o
+        # Handle elif branches iteratively instead of recursively
+        current_else_label = false_label
+        for elif_cond, elif_stmt in node.elif_branches:
+            # Generate code for elif condition
+            elif_cond_code, elif_cond_type = self.visit(elif_cond, Access(o.frame, o.sym))
+            
+            # Generate new false label for this elif
+            next_false_label = o.frame.get_new_label()
+            
+            # Emit elif condition code
+            self.emit.print_out(elif_cond_code)
+            
+            # If elif condition is false, jump to next branch
+            self.emit.print_out(self.emit.emit_if_false(next_false_label, o.frame))
+            
+            # Generate elif statement
+            self.visit(elif_stmt, o)
+            
+            # Jump to end (only if needed)
+            if not self._ends_with_return(elif_stmt):
+                self.emit.print_out(self.emit.emit_goto(end_label, o.frame))
+            
+            # Emit the false label for this elif
+            self.emit.print_out(self.emit.emit_label(next_false_label, o.frame))
+            
+            current_else_label = next_false_label
         
         # Generate else branch if it exists
         if node.else_stmt:
             self.visit(node.else_stmt, o)
         
-        # Emit end label if we have elif/else branches
-        if node.elif_branches or node.else_stmt:
+        # Emit end label only if it was used
+        if need_end_label or (node.elif_branches and not all(self._ends_with_return(stmt) for _, stmt in node.elif_branches)) or (node.else_stmt and not self._ends_with_return(node.else_stmt)):
             self.emit.print_out(self.emit.emit_label(end_label, o.frame))
         
         return o
+    
+    def _ends_with_return(self, stmt):
+        """Check if a statement ends with a return statement."""
+        if isinstance(stmt, ReturnStmt):
+            return True
+        elif isinstance(stmt, BlockStmt) and stmt.statements:
+            return self._ends_with_return(stmt.statements[-1])
+        return False
 
     def visit_while_stmt(self, node: "WhileStmt", o: SubBody = None):
         # Enter loop creates continue/break labels automatically
@@ -310,7 +431,7 @@ class CodeGenerator(ASTVisitor):
         element_idx = o.frame.get_new_index() # Current element (loop variable)
         
         # Create new symbol table with loop variable
-        loop_var_symbol = Symbol(node.loop_var, element_type, Index(element_idx))
+        loop_var_symbol = Symbol(node.variable, element_type, Index(element_idx))
         new_sym = [loop_var_symbol] + o.sym
         new_o = SubBody(o.frame, new_sym)
         
@@ -342,7 +463,7 @@ class CodeGenerator(ASTVisitor):
         code += self.emit.emit_read_var("", iterable_type, array_idx, o.frame)  # load array
         code += self.emit.emit_read_var("", IntType(), index_idx, o.frame)  # load index
         code += self.emit.emit_aload(element_type, o.frame)  # load array[index]
-        code += self.emit.emit_write_var(node.loop_var, element_type, element_idx, o.frame)  # store in loop var
+        code += self.emit.emit_write_var(node.variable, element_type, element_idx, o.frame)  # store in loop var
         
         self.emit.print_out(code)
         
@@ -399,15 +520,32 @@ class CodeGenerator(ASTVisitor):
         return o
 
     def visit_block_stmt(self, node: "BlockStmt", o: SubBody = None):
-        # Enter new scope
+        # Enter new scope with new labels
         o.frame.enter_scope(False)
+        
+        # Get the start and end labels for this block
+        start_label = o.frame.get_start_label()
+        end_label = o.frame.get_end_label()
+        
+        # Emit start label
+        self.emit.print_out(self.emit.emit_label(start_label, o.frame))
+        
+        # Save current symbol table for restoration after block
+        saved_sym = o.sym
+        current_o = o
         
         # Process all statements in the block
         for stmt in node.statements:
-            o = self.visit(stmt, o)
+            current_o = self.visit(stmt, current_o)
+        
+        # Emit end label
+        self.emit.print_out(self.emit.emit_label(end_label, o.frame))
         
         # Exit scope
         o.frame.exit_scope()
+        
+        # Restore original symbol table (remove block-local variables)
+        return SubBody(o.frame, saved_sym)
         
         return o
 
@@ -416,13 +554,18 @@ class CodeGenerator(ASTVisitor):
     def visit_id_lvalue(self, node: "IdLValue", o: Access = None):
         sym = next(
             filter(lambda x: x.name == node.name, o.sym),
-            False,
+            None,
         )
+
+        if sym is None:
+            raise IllegalOperandException(f"Undefined identifier: {node.name}")
 
         if type(sym.value) is Index:
             code = self.emit.emit_write_var(
                 sym.name, sym.type, sym.value.value, o.frame
             )
+        else:
+            raise IllegalOperandException(f"Cannot assign to: {node.name}")
 
         return code, sym.type
 
@@ -466,6 +609,15 @@ class CodeGenerator(ASTVisitor):
                     op_code = self.emit.emit_mul_op(op, result_type, o.frame)
             elif type(left_type) is FloatType or type(right_type) is FloatType:
                 result_type = FloatType()
+                
+                # Convert int operands to float if needed
+                if type(left_type) is IntType and type(right_type) is FloatType:
+                    # Convert left operand from int to float
+                    left_code += self.emit.emit_i2f(o.frame)
+                elif type(left_type) is FloatType and type(right_type) is IntType:
+                    # Convert right operand from int to float
+                    right_code += self.emit.emit_i2f(o.frame)
+                
                 if op in ["+", "-"]:
                     op_code = self.emit.emit_add_op(op, result_type, o.frame)
                 else:  # *, /, %
@@ -480,7 +632,25 @@ class CodeGenerator(ASTVisitor):
         # Handle comparison operations
         elif op in ["<", "<=", ">", ">=", "==", "!="]:
             result_type = BoolType()
-            op_code = self.emit.emit_re_op(op, left_type, o.frame)
+            if type(left_type) is StringType and type(right_type) is StringType:
+                # String comparison - only == and != are supported
+                if op == "==":
+                    # Use String.equals() method for equality - String.equals takes Object parameter
+                    # Use StringType for now but the emitter should generate the correct signature
+                    op_code = self.emit.emit_invoke_virtual("java/lang/String/equals", FunctionType([StringType()], BoolType()), o.frame)
+                    # Fix the method signature in the generated code since String.equals(Object) not String.equals(String)
+                    op_code = op_code.replace("(Ljava/lang/String;)Z", "(Ljava/lang/Object;)Z")
+                elif op == "!=":
+                    # Use String.equals() then negate
+                    op_code = (self.emit.emit_invoke_virtual("java/lang/String/equals", FunctionType([StringType()], BoolType()), o.frame) +
+                              self.emit.emit_not(BoolType(), o.frame))
+                    # Fix the method signature
+                    op_code = op_code.replace("(Ljava/lang/String;)Z", "(Ljava/lang/Object;)Z")
+                else:
+                    raise IllegalOperandException(f"String comparison '{op}' not supported")
+            else:
+                # Numeric comparison
+                op_code = self.emit.emit_re_op(op, left_type, o.frame)
         
         # Handle logical operations
         elif op == "&&":
@@ -520,19 +690,25 @@ class CodeGenerator(ASTVisitor):
 
     def visit_function_call(self, node: "FunctionCall", o: Access = None):
         function_name = node.function.name
-        function_symbol = next(filter(lambda x: x.name == function_name, o.sym), False)
+        function_symbol = next(filter(lambda x: x.name == function_name, o.sym), None)
+        if function_symbol is None:
+            raise IllegalOperandException(f"Undefined function: {function_name}")
         class_name = function_symbol.value.value
         argument_codes = []
         for argument in node.args:
             ac, at = self.visit(argument, Access(o.frame, o.sym))
             argument_codes += [ac]
 
+        # Get the return type from the function's type signature
+        function_type = function_symbol.type
+        return_type = function_type.return_type
+
         return (
             "".join(argument_codes)
             + self.emit.emit_invoke_static(
                 class_name + "/" + function_name, function_symbol.type, o.frame
             ),
-            VoidType(),
+            return_type,
         )
 
     def visit_array_access(self, node: "ArrayAccess", o: Access = None):
@@ -579,6 +755,9 @@ class CodeGenerator(ASTVisitor):
             jvm_type = "int"  # Booleans stored as integers
         elif type(element_type) is StringType:
             jvm_type = "java/lang/String"
+        elif type(element_type) is ArrayType:
+            # Multi-dimensional array - use the JVM type descriptor
+            jvm_type = self.emit.get_jvm_type(element_type)
         else:
             raise IllegalOperandException(f"Unsupported array element type: {type(element_type)}")
         
@@ -592,7 +771,7 @@ class CodeGenerator(ASTVisitor):
         if type(element_type) in [IntType, FloatType, BoolType]:
             code += self.emit.emit_new_array(jvm_type)
         else:
-            # Use anewarray for object types (strings, etc.)
+            # Use anewarray for object types (strings, arrays, etc.)
             code += self.emit.jvm.emitANEWARRAY(jvm_type)
         
         # Populate array elements
@@ -618,6 +797,10 @@ class CodeGenerator(ASTVisitor):
         if sym and type(sym.value) is Index:
             # Local variable
             code = self.emit.emit_read_var(sym.name, sym.type, sym.value.value, o.frame)
+            return code, sym.type
+        elif sym and type(sym.value) is CName:
+            # Global constant (static field)
+            code = self.emit.emit_get_static(f"{sym.value.value}/{sym.name}", sym.type, o.frame)
             return code, sym.type
         else:
             # This should not happen in well-formed programs

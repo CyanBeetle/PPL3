@@ -132,11 +132,16 @@ class Emitter:
         """
         f = float(in_)
         frame.push()
-        rst = "{0:.4f}".format(f)
-        if rst == "0.0000" or rst == "1.0000" or rst == "2.0000":
-            return self.jvm.emitFCONST(rst[:3])
+        # Use the original string to preserve precision, but convert special cases
+        # Check string representation to distinguish -0.0 from 0.0
+        if in_ == "0.0" or (f == 0.0 and not in_.startswith('-')):
+            return self.jvm.emitFCONST("0.0")
+        elif f == 1.0:
+            return self.jvm.emitFCONST("1.0")
+        elif f == 2.0:
+            return self.jvm.emitFCONST("2.0")
         else:
-            return self.jvm.emitLDC(rst)
+            return self.jvm.emitLDC(in_)
 
     def emit_push_const(self, in_: str, typ, frame) -> str:
         """
@@ -158,6 +163,10 @@ class Emitter:
         elif type(typ) is StringType:
             frame.push()
             return self.jvm.emitLDC(in_)
+        elif type(typ) is BoolType:
+            # Convert boolean string to integer (1 for "true", 0 for "false") 
+            value = 1 if in_.lower() == "true" else 0
+            return self.emit_push_iconst(value, frame)
         else:
             raise IllegalOperandException(in_)
 
@@ -176,8 +185,10 @@ class Emitter:
             IllegalOperandException: If type is not supported
         """
         frame.pop()
-        if type(in_) is IntType:
+        if type(in_) is IntType or type(in_) is BoolType:
             return self.jvm.emitIALOAD()
+        elif type(in_) is FloatType:
+            return self.jvm.emitFALOAD()
         elif (
             type(in_) is ArrayType or type(in_) is ClassType or type(in_) is StringType
         ):
@@ -202,8 +213,10 @@ class Emitter:
         frame.pop()
         frame.pop()
         frame.pop()
-        if type(in_) is IntType:
+        if type(in_) is IntType or type(in_) is BoolType:
             return self.jvm.emitIASTORE()
+        elif type(in_) is FloatType:
+            return self.jvm.emitFASTORE()
         elif (
             type(in_) is ArrayType or type(in_) is ClassType or type(in_) is StringType
         ):
@@ -248,7 +261,7 @@ class Emitter:
             IllegalOperandException: If type is not supported
         """
         frame.push()
-        if type(in_type) is IntType:
+        if type(in_type) is IntType or type(in_type) is BoolType:
             return self.jvm.emitILOAD(index)
         elif type(in_type) is FloatType:
             return self.jvm.emitFLOAD(index)
@@ -296,7 +309,7 @@ class Emitter:
         """
         frame.pop()
 
-        if type(in_type) is IntType:
+        if type(in_type) is IntType or type(in_type) is BoolType:
             return self.jvm.emitISTORE(index)
         elif type(in_type) is FloatType:
             return self.jvm.emitFSTORE(index)
@@ -457,9 +470,9 @@ class Emitter:
             Generated JVM instruction string
         """
         typ = in_
-        list(map(lambda x: frame.pop(), typ.partype))
+        list(map(lambda x: frame.pop(), typ.param_types))
         frame.pop()
-        if not type(typ) is VoidType:
+        if not type(typ.return_type) is VoidType:
             frame.push()
         return self.jvm.emitINVOKEVIRTUAL(lexeme, self.get_jvm_type(in_))
 
@@ -494,10 +507,10 @@ class Emitter:
         label2 = frame.get_new_label()
         result = list()
         result.append(self.emit_if_true(label1, frame))
-        result.append(self.emit_push_const("true", in_, frame))
+        result.append(self.emit_push_iconst(1, frame))  # true
         result.append(self.emit_goto(label2, frame))
         result.append(self.emit_label(label1, frame))
-        result.append(self.emit_push_const("false", in_, frame))
+        result.append(self.emit_push_iconst(0, frame))  # false
         result.append(self.emit_label(label2, frame))
         return "".join(result)
 
@@ -857,6 +870,12 @@ class Emitter:
         if type(in_) is IntType or type(in_) is BoolType:
             frame.pop()
             return self.jvm.emitIRETURN()
+        elif type(in_) is FloatType:
+            frame.pop()
+            return self.jvm.emitFRETURN()
+        elif type(in_) is StringType or type(in_) is ArrayType:
+            frame.pop()
+            return self.jvm.emitARETURN()
         elif type(in_) is VoidType:
             return self.jvm.emitRETURN()
 
