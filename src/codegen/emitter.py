@@ -517,13 +517,21 @@ class Emitter:
         if lexeme == "+":
             if type(in_) is IntType:
                 return self.jvm.emitIADD()
-            else:
+            elif type(in_) is FloatType:
                 return self.jvm.emitFADD()
+            elif type(in_) is StringType:
+                # String concatenation using Java's String.concat method
+                # Stack: ..., str1, str2 -> ..., result
+                return self.jvm.emitINVOKEVIRTUAL("java/lang/String/concat", "(Ljava/lang/String;)Ljava/lang/String;")
+            else:
+                raise Exception(f"Unsupported type for addition: {type(in_)}")
         else:
             if type(in_) is IntType:
                 return self.jvm.emitISUB()
-            else:
+            elif type(in_) is FloatType:
                 return self.jvm.emitFSUB()
+            else:
+                raise Exception(f"Unsupported type for subtraction: {type(in_)}")
 
     def emit_mul_op(self, lexeme: str, in_, frame) -> str:
         """
